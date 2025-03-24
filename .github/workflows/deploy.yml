@@ -1,31 +1,18 @@
-name: Deploy to EC2
+name: SSH Test
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  test-ssh:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-
-    - name: Set up SSH key
+    - name: Decode SSH key
       run: |
         echo "${{ secrets.EC2_SSH_KEY }}" | base64 --decode > ec2_key.pem
         chmod 600 ec2_key.pem
 
-    - name: Deploy to EC2 via SSH
+    - name: Try SSH into EC2
       run: |
-        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          docker stop webhook || true
-          docker rm webhook || true
-          cd ~/webhook-flask-app || git clone https://github.com/hariprasathudayakumar808/webhook-flask-app.git ~/webhook-flask-app
-          cd ~/webhook-flask-app
-          git pull origin main
-          docker build -t webhook-flask-app .
-          docker run -d -p 5000:5000 --name webhook webhook-flask-app
-        EOF
+        ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH SUCCESS'"
