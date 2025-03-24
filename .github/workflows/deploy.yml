@@ -16,22 +16,38 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
           chmod 600 ~/.ssh/ec2_key
-          ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Test SSH Connection
-        run: ssh -i ~/.ssh/ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH success!'"
+        run: ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH successful!'"
 
-      - name: Deploy via SSH
+      - name: Deploy Application
         run: |
           ssh -i ~/.ssh/ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /home/${{ secrets.EC2_USER }}
-            if [ ! -d "your-repo" ]; then
-              git clone https://github.com/yourusername/your-repo.git
+            set -e  # Exit on error
+            echo "--- Starting Deployment ---"
+            
+            # Navigate to app directory
+            APP_DIR="/home/$USER/my-app"
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+            
+            # Clone or update repo
+            if [ ! -d "repo" ]; then
+              git clone https://github.com/yourusername/your-repo.git repo
             fi
-            cd your-repo
-            git pull origin main
-            docker build -t your-app .
-            docker stop app || true
-            docker rm app || true
-            docker run -d -p 5000:5000 --name app your-app
+            cd repo
+            git fetch
+            git reset --hard origin/main
+            
+            # (Optional) If using Docker
+            if [ -f Dockerfile ]; then
+              docker build -t my-app .
+              docker stop my-app || true
+              docker rm my-app || true
+              docker run -d -p 5000:5000 --name my-app my-app
+            fi
+            
+            echo "--- Deployment Complete ---"
           EOF
