@@ -16,12 +16,21 @@ jobs:
 
       - name: Set up SSH key
         run: |
-          echo "${{ secrets.EC2_SSH_KEY }}"
-          chmod 600 ec2_key.pem
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
+          chmod 600 ~/.ssh/ec2_key.pem
+          ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: SSH into EC2 and deploy
+      - name: Test SSH connection
         run: |
-          ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
+
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e  # Exit immediately if any command fails
+            echo "Starting deployment..."
+            
             # Stop and remove old container if exists
             docker stop webhook || true
             docker rm webhook || true
@@ -32,9 +41,12 @@ jobs:
             fi
 
             cd webhook-flask-app
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
 
             # Build and run Docker container
             docker build -t webhook-flask-app .
             docker run -d -p 5000:5000 --name webhook webhook-flask-app
+            
+            echo "Deployment completed successfully"
           EOF
