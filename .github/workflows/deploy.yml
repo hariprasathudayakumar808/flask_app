@@ -43,10 +43,10 @@ jobs:
             
             # (Optional) If using Docker
             if [ -f Dockerfile ]; then
-              docker build -t my-app .
-              docker stop my-app || true
-              docker rm my-app || true
-              docker run -d -p 5000:5000 --name my-app my-app
+              docker build -t flask-app-2 .
+              docker images
+              docker run -d -p 5000:5000 --name my-app flask-app-2
+              docker ps
             fi
             
             echo "--- Deployment Complete ---"
