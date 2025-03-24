@@ -1,58 +1,37 @@
-name: Deploy Flask Webhook App to EC2
+name: Deploy to EC2
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   deploy:
-    name: Deploy to EC2
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up SSH with passphrase
+      - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
-          chmod 600 ~/.ssh/ec2_key.pem
-          
-          # Start SSH agent and add key with passphrase
-          eval $(ssh-agent -s)
-          echo "${{ secrets.EC2_SSH_PASSPHRASE }}" | ssh-add ~/.ssh/ec2_key.pem
-          
-          # Add host to known hosts
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
           ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-      
-      - name: Test SSH connection
-        run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
 
-      - name: Deploy to EC2
-        run: |
-          ssh -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            set -e  # Exit immediately if any command fails
-            echo "Starting deployment..."
-            
-            # Stop and remove old container if exists
-            docker stop webhook || true
-            docker rm webhook || true
+      - name: Test SSH Connection
+        run: ssh -i ~/.ssh/ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH success!'"
 
-            # Clone or pull the latest code
-            if [ ! -d "webhook-flask-app" ]; then
-              git clone https://github.com/hariprasathudayakumar808/webhook-flask-app.git
+      - name: Deploy via SSH
+        run: |
+          ssh -i ~/.ssh/ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd /home/${{ secrets.EC2_USER }}
+            if [ ! -d "your-repo" ]; then
+              git clone https://github.com/yourusername/your-repo.git
             fi
-
-            cd webhook-flask-app
-            git fetch origin
-            git reset --hard origin/main
-
-            # Build and run Docker container
-            docker build -t webhook-flask-app .
-            docker run -d -p 5000:5000 --name webhook webhook-flask-app
-            
-            echo "Deployment completed successfully"
+            cd your-repo
+            git pull origin main
+            docker build -t your-app .
+            docker stop app || true
+            docker rm app || true
+            docker run -d -p 5000:5000 --name app your-app
           EOF
